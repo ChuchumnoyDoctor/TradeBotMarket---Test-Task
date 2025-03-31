@@ -11,8 +11,10 @@ public interface IFuturePriceRepository
     Task<FuturePrice?> GetLatestPriceAsync(string symbol);
     Task<IEnumerable<FuturePrice>> GetPricesByDateRangeAsync(string symbol, DateTime startDate, DateTime endDate);
     Task<IEnumerable<FuturePrice>> GetPricesForPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken);
+    Task<FuturePrice> GetPriceBySymbolAndTimestampAsync(string symbol, DateTime timestamp);
+    Task<FuturePrice> GetLastAvailablePriceAsync(string symbol);
+    Task<int> GetTotalRecordsCountAsync();
     Task AddPriceAsync(FuturePrice price);
     Task UpdateAsync(FuturePrice price);
-    Task<FuturePrice?> GetPriceBySymbolAndTimestampAsync(string symbol, DateTime timestamp);
     Task SaveChangesAsync();
 } 

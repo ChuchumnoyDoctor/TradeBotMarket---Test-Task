@@ -5,11 +5,30 @@ using TradeBotMarket.Domain.Models;
 using TradeBotMarket.Domain.Constants;
 using TradeBotMarket.Domain.Enums;
 using TradeBotMarket.Domain.Extensions;
+using Prometheus;
 
 namespace TradeBotMarket.Domain.Services;
 
 public class BinanceFutureDataService : IFutureDataService
 {
+    private static readonly Counter BinanceApiRequests = Metrics
+        .CreateCounter("binance_api_requests_total", "Number of requests made to Binance API");
+    
+    private static readonly Counter BinanceApiErrors = Metrics
+        .CreateCounter("binance_api_errors_total", "Number of failed requests to Binance API");
+    
+    private static readonly Counter HistoricalPriceUsage = Metrics
+        .CreateCounter("historical_price_usage_total", "Number of times historical prices were used");
+    
+    private static readonly Gauge PriceDifference = Metrics
+        .CreateGauge("price_difference", "Current price difference between quarterly and bi-quarterly contracts");
+    
+    private static readonly Histogram BinanceApiDuration = Metrics
+        .CreateHistogram("binance_api_duration_seconds", "Duration of Binance API requests");
+    
+    private static readonly Gauge DatabaseRecordsTotal = Metrics
+        .CreateGauge("database_records_total", "Total number of records in the database");
+    
     private readonly ILogger<BinanceFutureDataService> _logger;
     private readonly HttpClient _httpClient;
     private readonly IJsonDeserializerService _jsonDeserializer;
@@ -44,7 +63,7 @@ public class BinanceFutureDataService : IFutureDataService
             }
 
             var btcSymbols = exchangeInfo.Symbols
-                .Where(s => s.BaseAsset == "BTC" && s.QuoteAsset == "USDT" && !string.IsNullOrEmpty(s.ContractType))
+                .Where(s => s.BaseAsset == FutureSymbols.BTC && s.QuoteAsset == FutureSymbols.USDT && !string.IsNullOrEmpty(s.ContractType))
                 .ToList();
 
             var contractTypes = btcSymbols
@@ -120,86 +139,90 @@ public class BinanceFutureDataService : IFutureDataService
 
     public async Task<IEnumerable<FuturePrice>> GetHistoricalPricesAsync(string symbol, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
     {
-        try
+        BinanceApiRequests.Inc();
+        using (BinanceApiDuration.NewTimer())
         {
-            // Получаем информацию о контракте
-            var actualSymbol = await GetActualSymbolAsync(symbol, cancellationToken);
-            var startTimeMs = ((DateTimeOffset)startDate).ToUnixTimeMilliseconds();
-            var endTimeMs = ((DateTimeOffset)endDate).ToUnixTimeMilliseconds();
-            var interval = "1h"; // Используем часовые интервалы вместо минутных для уменьшения объема данных
-            
-            // Определяем тип контракта
-            string contractType = symbol == FutureSymbolType.QuarterlyContract.GetEnumMemberValue() 
-                ? FutureSymbols.CURRENT_QUARTER_CONTRACT 
-                : FutureSymbols.NEXT_QUARTER_CONTRACT;
-            
-            _logger.LogInformation("Requesting historical data for {Symbol}, from {StartDate} to {EndDate}", 
-                actualSymbol, startDate, endDate);
-            
-            // Используем continuousKlines для фьючерсных контрактов с базовой парой BTCUSDT
-            var requestUrl = $"{BaseUrl}/continuousKlines?pair=BTCUSDT&contractType={contractType}&interval={interval}&startTime={startTimeMs}&endTime={endTimeMs}&limit=1000";
-            _logger.LogInformation("Request URL: {Url}", requestUrl);
-            
-            var response = await _httpClient.GetAsync(requestUrl, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            
-            if (string.IsNullOrEmpty(content) || content == "[]")
-            {
-                _logger.LogWarning("Empty response received for symbol {Symbol}", actualSymbol);
-                return Array.Empty<FuturePrice>();
-            }
-            
             try
             {
-                var klines = _jsonDeserializer.Deserialize<List<object[]>>(content);
+                // Получаем информацию о контракте
+                var actualSymbol = await GetActualSymbolAsync(symbol, cancellationToken);
+                var startTimeMs = ((DateTimeOffset)startDate).ToUnixTimeMilliseconds();
+                var endTimeMs = ((DateTimeOffset)endDate).ToUnixTimeMilliseconds();
+                var interval = "1h"; // Используем часовые интервалы вместо минутных для уменьшения объема данных
                 
-                if (klines == null || !klines.Any())
+                // Определяем тип контракта
+                string contractType = symbol == FutureSymbolType.QuarterlyContract.GetEnumMemberValue() 
+                    ? FutureSymbols.CURRENT_QUARTER_CONTRACT 
+                    : FutureSymbols.NEXT_QUARTER_CONTRACT;
+                
+                _logger.LogInformation("Requesting historical data for {Symbol}, from {StartDate} to {EndDate}", 
+                    actualSymbol, startDate, endDate);
+                
+                // Используем continuousKlines для фьючерсных контрактов с базовой парой BTCUSDT
+                var requestUrl = $"{BaseUrl}/continuousKlines?pair={FutureSymbols.BTCUSDT}&contractType={contractType}&interval={interval}&startTime={startTimeMs}&endTime={endTimeMs}&limit=1000";
+                _logger.LogInformation("Request URL: {Url}", requestUrl);
+                
+                var response = await _httpClient.GetAsync(requestUrl, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                
+                if (string.IsNullOrEmpty(content) || content == "[]")
                 {
-                    _logger.LogWarning("No klines found for symbol {Symbol}", actualSymbol);
+                    _logger.LogWarning("Empty response received for symbol {Symbol}", actualSymbol);
                     return Array.Empty<FuturePrice>();
                 }
                 
-                var prices = new List<FuturePrice>();
-                foreach (var kline in klines)
+                try
                 {
-                    if (kline.Length < 5)
+                    var klines = _jsonDeserializer.Deserialize<List<object[]>>(content);
+                    
+                    if (klines == null || !klines.Any())
                     {
-                        _logger.LogWarning("Invalid kline format for {Symbol}: {Kline}", actualSymbol, string.Join(", ", kline));
-                        continue;
+                        _logger.LogWarning("No klines found for symbol {Symbol}", actualSymbol);
+                        return Array.Empty<FuturePrice>();
                     }
                     
-                    if (long.TryParse(kline[0].ToString(), out long timestampMs) &&
-                        decimal.TryParse(kline[4].ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal closePrice))
+                    var prices = new List<FuturePrice>();
+                    foreach (var kline in klines)
                     {
-                        var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(timestampMs).UtcDateTime;
-                        
-                        prices.Add(new FuturePrice
+                        if (kline.Length < 5)
                         {
-                            Symbol = symbol,
-                            Price = closePrice,
-                            Timestamp = timestamp,
-                            IsLastAvailable = timestamp >= endDate.AddHours(-1)
-                        });
+                            _logger.LogWarning("Invalid kline format for {Symbol}: {Kline}", actualSymbol, string.Join(", ", kline));
+                            continue;
+                        }
+                        
+                        if (long.TryParse(kline[0].ToString(), out long timestampMs) &&
+                            decimal.TryParse(kline[4].ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal closePrice))
+                        {
+                            var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(timestampMs).UtcDateTime;
+                            
+                            prices.Add(new FuturePrice
+                            {
+                                Symbol = symbol,
+                                Price = closePrice,
+                                Timestamp = timestamp,
+                                IsLastAvailable = timestamp >= endDate.AddHours(-1)
+                            });
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Could not parse timestamp or price for kline: {Kline}", string.Join(", ", kline));
+                        }
                     }
-                    else
-                    {
-                        _logger.LogWarning("Could not parse timestamp or price for kline: {Kline}", string.Join(", ", kline));
-                    }
+                    
+                    return prices;
                 }
-                
-                return prices;
+                catch (Exception jsonEx)
+                {
+                    _logger.LogError(jsonEx, "Error deserializing klines for {Symbol}", actualSymbol);
+                    throw;
+                }
             }
-            catch (Exception jsonEx)
+            catch (Exception ex)
             {
-                _logger.LogError(jsonEx, "Error deserializing klines for {Symbol}", actualSymbol);
+                _logger.LogError(ex, "Error getting historical prices for symbol {Symbol}", symbol);
                 throw;
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting historical prices for symbol {Symbol}", symbol);
-            throw;
         }
     }
 
@@ -209,7 +232,32 @@ public class BinanceFutureDataService : IFutureDataService
         {
             try
             {
-                var price = await GetLatestPriceAsync(symbol, cancellationToken);
+                BinanceApiRequests.Inc();
+                decimal price;
+                bool isHistoricalPrice = false;
+                
+                try
+                {
+                    using (BinanceApiDuration.NewTimer())
+                    {
+                        price = await GetLatestPriceAsync(symbol, cancellationToken);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    BinanceApiErrors.Inc();
+                    _logger.LogWarning(ex, "Failed to get current price for {Symbol}, trying to use last available price", symbol);
+                    
+                    var lastPrice = await _repository.GetLastAvailablePriceAsync(symbol);
+                    if (lastPrice == null)
+                    {
+                        throw new Exception($"No historical price available for {symbol}", ex);
+                    }
+                    
+                    price = lastPrice.Price;
+                    isHistoricalPrice = true;
+                    HistoricalPriceUsage.Inc();
+                }
 
                 var now = DateTime.UtcNow;
                 var roundedTime = new DateTime(
@@ -225,7 +273,7 @@ public class BinanceFutureDataService : IFutureDataService
                 if (existingPrice != null)
                 {
                     existingPrice.Price = price;
-                    existingPrice.IsLastAvailable = true;
+                    existingPrice.IsLastAvailable = !isHistoricalPrice;
                     await _repository.UpdateAsync(existingPrice);
                 }
                 else
@@ -235,15 +283,43 @@ public class BinanceFutureDataService : IFutureDataService
                         Symbol = symbol,
                         Price = price,
                         Timestamp = roundedTime,
-                        IsLastAvailable = true
+                        IsLastAvailable = !isHistoricalPrice
                     };
                     await _repository.AddPriceAsync(futurePrice);
                 }
             }
             catch (Exception ex)
             {
+                BinanceApiErrors.Inc();
                 _logger.LogError(ex, "Error collecting data for symbol {Symbol}", symbol);
             }
+        }
+
+        // Обновляем метрику разницы цен
+        try
+        {
+            var quarterlyPrice = await _repository.GetLastAvailablePriceAsync(FutureSymbolType.QuarterlyContract.GetEnumMemberValue());
+            var biQuarterlyPrice = await _repository.GetLastAvailablePriceAsync(FutureSymbolType.BiQuarterlyContract.GetEnumMemberValue());
+            
+            if (quarterlyPrice != null && biQuarterlyPrice != null)
+            {
+                PriceDifference.Set(Math.Abs((double)(quarterlyPrice.Price - biQuarterlyPrice.Price)));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating price difference metric");
+        }
+
+        // Обновляем метрику количества записей
+        try
+        {
+            var totalRecords = await _repository.GetTotalRecordsCountAsync();
+            DatabaseRecordsTotal.Set(totalRecords);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating database records metric");
         }
 
         await _repository.SaveChangesAsync();

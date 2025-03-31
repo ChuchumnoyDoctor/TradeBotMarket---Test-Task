@@ -8,8 +8,22 @@ using TradeBotMarket.DataAccess.Repositories;
 using TradeBotMarket.Domain.Interfaces;
 using TradeBotMarket.ApiService.Extensions;
 using TradeBotMarket.Domain.Services;
+using Serilog;
+using Serilog.Events;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Настройка Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("logs/api-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -68,6 +82,10 @@ builder.Services.AddScoped<IPriceDifferenceRepository, PriceDifferenceRepository
 builder.Services.AddScoped<IJsonDeserializerService, JsonDeserializerService>();
 
 var app = builder.Build();
+
+// Добавляем метрики Prometheus
+app.UseMetricServer();
+app.UseHttpMetrics();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -103,4 +103,17 @@ public class FuturePriceRepository : IFuturePriceRepository
     {
         await _context.SaveChangesAsync();
     }
+
+    public async Task<FuturePrice> GetLastAvailablePriceAsync(string symbol)
+    {
+        return await _context.FuturePrices
+            .Where(p => p.Symbol == symbol && p.IsLastAvailable)
+            .OrderByDescending(p => p.Timestamp)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<int> GetTotalRecordsCountAsync()
+    {
+        return await _context.FuturePrices.CountAsync();
+    }
 } 
