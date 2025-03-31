@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeBotMarket.ApiService",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeBotMarket.DataCollector", "TradeBotMarket.DataCollector\TradeBotMarket.DataCollector.csproj", "{4647A586-9E7A-9EF1-8F28-AD140CB32F18}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeBotMarket.Tests", "TradeBotMarket.Tests\TradeBotMarket.Tests.csproj", "{5277320D-0978-E729-1296-7C210F59BD8F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{4647A586-9E7A-9EF1-8F28-AD140CB32F18}.Release|x64.Build.0 = Release|Any CPU
 		{4647A586-9E7A-9EF1-8F28-AD140CB32F18}.Release|x86.ActiveCfg = Release|Any CPU
 		{4647A586-9E7A-9EF1-8F28-AD140CB32F18}.Release|x86.Build.0 = Release|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Debug|x64.Build.0 = Debug|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Debug|x86.Build.0 = Debug|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Release|x64.ActiveCfg = Release|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Release|x64.Build.0 = Release|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Release|x86.ActiveCfg = Release|Any CPU
+		{5277320D-0978-E729-1296-7C210F59BD8F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

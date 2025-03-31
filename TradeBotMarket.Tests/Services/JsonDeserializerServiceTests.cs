@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Moq;
+using Newtonsoft.Json;
 using TradeBotMarket.Domain.Constants;
 using TradeBotMarket.Domain.Models;
 using TradeBotMarket.Domain.Services;

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TradeBotMarket.DataAccess.Data;
 using TradeBotMarket.DataAccess.Repositories;
 using TradeBotMarket.Domain.Enums;
+using TradeBotMarket.Domain.Extensions;
 using TradeBotMarket.Domain.Models;
 using Xunit;
 

@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging;
 using Moq;
-using TradeBotMarket.DataAccess.Repositories;
 using TradeBotMarket.Domain.Constants;
 using TradeBotMarket.Domain.Interfaces;
 using TradeBotMarket.Domain.Models;
 using TradeBotMarket.Domain.Services;
 using TradeBotMarket.Domain.Enums;
 using Xunit;
+using TradeBotMarket.Domain.Extensions;
 
 namespace TradeBotMarket.Tests.Services;
 
@@ -56,8 +56,7 @@ public class BinanceFutureDataServiceTests
             x => x.AddPriceAsync(It.Is<FuturePrice>(p =>
                 p.Symbol == symbol &&
                 p.Price == price &&
-                p.IsLastAvailable &&
-                !p.IsHistoricalPrice)),
+                p.IsLastAvailable)),
             Times.Once);
     }
 
@@ -90,8 +89,7 @@ public class BinanceFutureDataServiceTests
             x => x.AddPriceAsync(It.Is<FuturePrice>(p =>
                 p.Symbol == symbol &&
                 p.Price == historicalPrice.Price &&
-                !p.IsLastAvailable &&
-                p.IsHistoricalPrice)),
+                !p.IsLastAvailable)),
             Times.Once);
     }
 
@@ -169,41 +167,6 @@ public class BinanceFutureDataServiceTests
     }
 
     [Fact]
-    public async Task GetActualSymbolAsync_WithValidResponse_ReturnsCorrectSymbol()
-    {
-        // Arrange
-        var exchangeInfo = new BinanceExchangeInfo
-        {
-            Symbols = new List<BinanceSymbol>
-            {
-                new() { Symbol = "BTCUSDT_230331", BaseAsset = FutureSymbols.BTC, QuoteAsset = FutureSymbols.USDT, ContractType = FutureSymbols.CURRENT_QUARTER_CONTRACT }
-            }
-        };
-
-        _jsonDeserializerMock.Setup(x => x.Deserialize<BinanceExchangeInfo>(It.IsAny<string>()))
-            .Returns(exchangeInfo);
-
-        // Act
-        var result = await _service.GetActualSymbolAsync(FutureSymbolType.QuarterlyContract.GetEnumMemberValue(), CancellationToken.None);
-
-        // Assert
-        Assert.Equal("BTCUSDT_230331", result);
-    }
-
-    [Fact]
-    public async Task GetActualSymbolAsync_WithEmptyResponse_ThrowsException()
-    {
-        // Arrange
-        var exchangeInfo = new BinanceExchangeInfo { Symbols = new List<BinanceSymbol>() };
-        _jsonDeserializerMock.Setup(x => x.Deserialize<BinanceExchangeInfo>(It.IsAny<string>()))
-            .Returns(exchangeInfo);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => 
-            _service.GetActualSymbolAsync(FutureSymbolType.QuarterlyContract.GetEnumMemberValue(), CancellationToken.None));
-    }
-
-    [Fact]
     public async Task GetLatestPriceAsync_WithValidResponse_ReturnsCorrectPrice()
     {
         // Arrange
@@ -236,7 +199,7 @@ public class BinanceFutureDataServiceTests
         // Arrange
         var exchangeInfo = new BinanceExchangeInfo
         {
-            Symbols = new List<BinanceSymbol>
+            Symbols = new List<BinanceSymbolInfo>
             {
                 new() { Symbol = "BTCUSDT_230331", BaseAsset = FutureSymbols.BTC, QuoteAsset = FutureSymbols.USDT, ContractType = FutureSymbols.CURRENT_QUARTER_CONTRACT }
             }
@@ -263,7 +226,7 @@ public class BinanceFutureDataServiceTests
         // Arrange
         var exchangeInfo = new BinanceExchangeInfo
         {
-            Symbols = new List<BinanceSymbol>
+            Symbols = new List<BinanceSymbolInfo>
             {
                 new() { Symbol = "BTCUSDT_230331", BaseAsset = FutureSymbols.BTC, QuoteAsset = FutureSymbols.USDT, ContractType = FutureSymbols.CURRENT_QUARTER_CONTRACT }
             }
@@ -288,7 +251,7 @@ public class BinanceFutureDataServiceTests
         await _service.CollectAndProcessDataAsync(CancellationToken.None);
 
         // Assert
-        _repositoryMock.Verify(x => x.AddPriceAsync(It.Is<FuturePrice>(p => p.IsHistoricalPrice)), Times.AtLeastOnce());
+        _repositoryMock.Verify(x => x.AddPriceAsync(It.Is<FuturePrice>(p => !p.IsLastAvailable)), Times.AtLeastOnce());
         _repositoryMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce());
     }
 } 

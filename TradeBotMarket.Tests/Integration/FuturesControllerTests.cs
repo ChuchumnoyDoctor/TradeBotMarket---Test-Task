@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.VisualStudio.TestPlatform.TestHost;
 using System.Net;
 using System.Text.Json;
-using TradeBotMarket.ApiService;
 using TradeBotMarket.DataAccess.Data;
-using TradeBotMarket.Domain.Constants;
+using TradeBotMarket.Domain.Enums;
+using TradeBotMarket.Domain.Extensions;
 using TradeBotMarket.Domain.Models;
 using Xunit;
 
