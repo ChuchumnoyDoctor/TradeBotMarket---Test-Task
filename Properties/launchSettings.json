@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TradeBotMarket - Test Task": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
