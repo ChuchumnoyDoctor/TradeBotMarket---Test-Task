@@ -1,157 +1,191 @@
 # TradeBotMarket
 
-Система для сбора и анализа данных о ценах фьючерсных контрактов Bitcoin с биржи Binance.
+Проект для анализа разницы цен между квартальными фьючерсными контрактами BTCUSDT на бирже Binance.
 
-## Назначение
+## Архитектура
 
-TradeBotMarket предназначен для:
-- Сбора актуальных цен фьючерсных контрактов BTC/USDT (квартальных и биквартальных)
-- Выгрузки исторических данных за выбранные периоды
-- Расчета разницы цен между различными типами контрактов
-- Хранения исторических данных и расчетов в базе данных
-- Предоставления API для доступа к собранным данным
+Проект построен на основе микросервисной архитектуры и состоит из следующих компонентов:
 
-## Архитектура проекта
+### Сервисы
+- **ApiService** - REST API для получения данных о ценах и разнице между контрактами
+- **DataCollector** - Консольное приложение для сбора и обработки данных с Binance API, работающее по расписанию
 
-Проект разделен на несколько модулей:
+### Библиотеки
+- **Domain** - Бизнес-логика, интерфейсы и модели
+- **DataAccess** - Работа с базой данных, репозитории и миграции
+- **Tests** - Unit и интеграционные тесты
 
-### TradeBotMarket.Domain
-Содержит основные модели данных, интерфейсы и константы:
-- Модели данных:
-  - `FuturePrice` - модель для хранения исторических цен фьючерсов
-  - `PriceDifference` - модель для хранения разницы цен
-- Интерфейсы:
-  - `IFutureDataService` - сервис для получения данных о ценах с биржи Binance
-  - `IFuturePriceRepository` - репозиторий для работы с ценами фьючерсов
-  - `IPriceDifferenceRepository` - репозиторий для работы с разницей цен
-  - `IJsonDeserializerService` - сервис для десериализации JSON
-- Enums:
-  - `FutureSymbolType` - типы фьючерсных контрактов (QuarterlyContract, BiQuarterlyContract)
-- Константы:
-  - `FutureSymbols` - константы для работы с фьючерсными контрактами
+## Технологии
 
-### TradeBotMarket.DataAccess
-Содержит компоненты для работы с базой данных:
-- `ApplicationDbContext` - контекст Entity Framework Core
-- Репозитории:
-  - `FuturePriceRepository` - реализация репозитория для цен фьючерсов
-  - `PriceDifferenceRepository` - реализация репозитория для разницы цен
-- Миграции базы данных для PostgreSQL
+### Backend
+- **.NET 9.0** - Основной фреймворк
+- **ASP.NET Core** - Web API
+- **Entity Framework Core** - ORM для работы с базой данных
+- **Quartz.NET** - Планировщик задач
+- **Prometheus-net** - Сбор метрик
+- **Serilog** - Логирование
 
-### TradeBotMarket.DataCollector
-Сервис для сбора и обработки данных:
-- `BinanceFutureDataService` - реализация сервиса для работы с API Binance
-- `JsonDeserializerService` - сервис для десериализации JSON
-- `PriceDifferenceCalculator` - сервис для расчета разницы цен
-- Задачи Quartz.NET:
-  - `PriceCollectionJob` - задача для сбора текущих цен
-  - `HistoricalDataCollectionJob` - задача для выгрузки исторических данных
+### База данных
+- **PostgreSQL** - Основная база данных
 
-### TradeBotMarket.ApiService
-API для доступа к данным:
-- `FuturesController` - контроллер для доступа к ценам и разницам цен
-- ModelBinders:
-  - `FutureSymbolTypeModelBinder` - кастомный биндер для преобразования строк в FutureSymbolType
-- Middleware:
-  - `ExceptionHandlingMiddleware` - обработка исключений в API
-- Swagger для документации API
-- Настройка CORS для разрешения кросс-доменных запросов
+### Мониторинг
+- **Prometheus** - Сбор и хранение метрик
+- **Grafana** - Визуализация метрик
+
+### Контейнеризация
+- **Docker** - Контейнеризация сервисов
+- **Docker Compose** - Оркестрация контейнеров
+
+### Тестирование
+- **xUnit** - Фреймворк для тестирования
+- **Moq** - Библиотека для мокирования
+- **WebApplicationFactory** - Интеграционное тестирование
 
 ## Функциональность
 
-- **Сбор текущих цен**: Каждую минуту система собирает актуальные цены фьючерсных контрактов
-- **Исторические данные**: При старте выгружаются исторические данные за последний год
-- **Расчет разницы цен**: Система рассчитывает разницу между ценами различных типов контрактов
-- **API для доступа к данным**: REST API с ограничением количества возвращаемых элементов
+1. Сбор данных:
+   - Получение цен квартальных фьючерсов BTCUSDT
+   - Вычисление разницы между ценами
+   - Сохранение исторических данных
+   - Обработка ситуаций с отсутствующими данными
 
-## Требования для запуска
+2. API Endpoints:
+   - GET /api/Futures - получение всех цен с пагинацией (maxItems)
+   - GET /api/Futures/{symbol} - получение цен по символу (QuarterlyContract/BiQuarterlyContract)
+   - GET /api/Futures/period - получение цен за период (startDate, endDate)
+   - GET /api/Futures/price-differences - получение разницы цен с пагинацией
+   - GET /api/Futures/price-differences/{symbol} - получение разницы цен по символу
 
-- .NET 9.0
-- PostgreSQL
-- Quartz.NET
-- Доступ к API Binance
+3. Мониторинг:
+   - Разница цен между контрактами
+   - Количество запросов к Binance API
+   - Время ответа API
+   - Количество ошибок
+   - Количество записей в базе данных
 
-## Настройка базы данных
+## Конфигурация и безопасность
 
-1. Установите PostgreSQL
-2. Создайте базу данных с именем `TradeBotMarket`
-3. Настройте строку подключения в `appsettings.json`:
+### HTTPS и сертификаты
+1. Генерация сертификатов:
+   ```powershell
+   # Запустите скрипт из директории certs
+   .\generate-cert.ps1
+   ```
 
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Database=TradeBotMarket;Username=postgres;Password=postgres"
-  }
-}
-```
+2. Конфигурация портов:
+   - HTTP: 8080
+   - HTTPS: 8081
 
-## Миграция базы данных
-
-Миграция базы данных выполняется автоматически при запуске приложения. Если вы хотите выполнить миграцию вручную, используйте следующие команды:
-
-1. Установите инструменты Entity Framework Core:
-```bash
-dotnet tool install --global dotnet-ef
-```
-
-2. Выполните миграцию:
-```bash
-cd TradeBotMarket.DataAccess
-dotnet ef database update
-```
-
-3. Для создания новой миграции (при изменении моделей):
-```bash
-cd TradeBotMarket.DataAccess
-dotnet ef migrations add MigrationName
-```
+3. Переменные окружения для HTTPS:
+   ```env
+   ASPNETCORE_URLS=http://+:8080;https://+:8081
+   ASPNETCORE_Kestrel__Certificates__Default__Path=/path/to/certificate.pfx
+   ASPNETCORE_Kestrel__Certificates__Default__Password=your_password
+   ```
 
 ## Запуск проекта
 
-### Запуск DataCollector (сбор данных)
+1. Клонировать репозиторий:
 ```bash
-cd TradeBotMarket.DataCollector
-dotnet run
+git clone https://github.com/yourusername/TradeBotMarket.git
 ```
 
-### Запуск API
-```bash
-cd TradeBotMarket.ApiService
-dotnet run
+2. Сгенерировать SSL сертификаты:
+```powershell
+cd certs
+.\generate-cert.ps1
 ```
 
-API будет доступно по адресу `http://localhost:5000` и `https://localhost:7001`.
-Документация Swagger: `http://localhost:5000/swagger`
+3. Запустить через Docker Compose:
+```bash
+docker-compose up -d
+```
 
-## Основные эндпоинты API
+4. Доступные сервисы:
+   - API HTTP: http://localhost:8080
+   - API HTTPS: https://localhost:8081
+   - Swagger: http://localhost:8080/swagger или https://localhost:8081/swagger
+   - Grafana: http://localhost:3000 (admin/admin)
+     - Дашборд с метриками разницы цен
+     - Мониторинг производительности API
+     - Статистика сбора данных
+   - Prometheus: http://localhost:9090
+     - Сбор метрик с API и DataCollector
+     - Хранение исторических данных метрик
 
-- `GET /api/Futures` - Получение всех цен (с ограничением maxItems, по умолчанию 100)
-- `GET /api/Futures/{symbol}` - Получение цен по типу контракта (Enum: QuarterlyContract, BiQuarterlyContract)
-- `GET /api/Futures/period?startDate={date}&endDate={date}` - Получение цен за период
-- `GET /api/Futures/price-differences` - Получение всех разниц цен (с ограничением maxItems)
-- `GET /api/Futures/price-differences/{symbol}` - Получение разниц цен по типу контракта (Enum)
+## Разработка
 
-## Особенности работы с API Binance
+1. Требования:
+   - .NET SDK 9.0
+   - Docker Desktop
+   - PostgreSQL (если запуск без Docker)
 
-Для получения данных по фьючерсным контрактам используется API Binance Futures:
-- Для получения текущих цен: `/fapi/v1/ticker/price`
-- Для получения исторических данных: `/fapi/v1/continuousKlines?pair=BTCUSDT&contractType={contractType}`
-- Для получения информации о доступных контрактах: `/fapi/v1/exchangeInfo`
+2. Настройка базы данных:
+```bash
+dotnet ef database update --project TradeBotMarket.DataAccess
+```
 
-## Особенности реализации
+3. Запуск тестов:
+```bash
+dotnet test
+```
 
-- **Enum для типов контрактов**: Использование enum `FutureSymbolType` с поддержкой атрибутов EnumMember
-- **Кастомный ModelBinder**: Реализован для корректного преобразования строковых значений в enum
-- **Улучшенная документация Swagger**: Отображение enum с описаниями и возможными значениями
-- **Ограничение количества элементов**: Все запросы API с получением списков имеют параметр `maxItems`
-- **Сортировка данных**: Данные из БД возвращаются отсортированными по времени (от новых к старым)
-- **Обработка ошибок**: Middleware для обработки исключений и возврата структурированных ошибок
-- **CORS**: Настроена политика CORS для доступа к API из браузерных приложений
+## Архитектурные решения
 
-## Исходный код
+1. Clean Architecture:
+   - Разделение на слои (Domain, DataAccess, Services)
+   - Инверсия зависимостей
+   - Единая точка ответственности
 
-Код организован с использованием лучших практик .NET:
-- SOLID принципы проектирования
-- Dependency Injection для управления зависимостями
-- Repository Pattern для работы с данными
-- Clean Architecture для разделения ответственности между слоями 
+2. Паттерны:
+   - Repository Pattern
+   - Unit of Work
+   - Dependency Injection
+   - Observer (для метрик)
+
+3. Обработка ошибок:
+   - Глобальная обработка исключений через Middleware
+   - Логирование через Serilog с ротацией файлов
+   - Метрики ошибок в Prometheus
+
+4. Масштабируемость:
+   - Микросервисная архитектура
+   - Контейнеризация
+   - Независимое масштабирование сервисов
+
+## Метрики и мониторинг
+
+1. Бизнес-метрики:
+   - Разница цен между контрактами
+   - Количество обработанных контрактов
+   - Использование исторических цен
+
+2. Технические метрики:
+   - Latency API запросов
+   - Количество ошибок
+   - Размер базы данных
+   - Время выполнения задач
+
+## Логирование
+
+1. Конфигурация Serilog:
+   - Логирование в консоль
+   - Ротация файлов логов по дням
+   - Путь к логам: `logs/api-.txt`
+
+2. Уровни логирования:
+   - Debug - для детальной отладки
+   - Information - для основных событий
+   - Warning - для предупреждений
+   - Error - для ошибок
+
+## Безопасность
+
+1. CORS:
+   - Настроена политика AllowAll для разработки
+   - Возможность настройки под конкретные домены
+
+2. HTTPS:
+   - Поддержка SSL/TLS
+   - Автоматическая генерация сертификатов
+   - Конфигурируемые порты

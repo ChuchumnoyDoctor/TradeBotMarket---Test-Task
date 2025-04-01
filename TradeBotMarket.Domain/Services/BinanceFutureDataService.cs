@@ -29,6 +29,9 @@ public class BinanceFutureDataService : IFutureDataService
     private static readonly Gauge DatabaseRecordsTotal = Metrics
         .CreateGauge("database_records_total", "Total number of records in the database");
     
+    private static readonly Gauge LastPrice = Metrics
+        .CreateGauge("binance_last_price", "Last price from Binance API", new string[] { "symbol" });
+    
     private readonly ILogger<BinanceFutureDataService> _logger;
     private readonly HttpClient _httpClient;
     private readonly IJsonDeserializerService _jsonDeserializer;
@@ -114,7 +117,12 @@ public class BinanceFutureDataService : IFutureDataService
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
+            // Обновляем метрику последней цены
             var priceResponse = _jsonDeserializer.Deserialize<BinancePriceResponse>(content);
+            if (priceResponse != null)
+            {
+                LastPrice.WithLabels(symbol).Set(double.Parse(priceResponse.Price, CultureInfo.InvariantCulture));
+            }
 
             if (priceResponse == null || !decimal.TryParse(priceResponse.Price, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal price))
             {

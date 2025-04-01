@@ -14,6 +14,21 @@ using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Определяем среду выполнения
+var isDevelopment = builder.Environment.IsDevelopment();
+
+// Настраиваем Kestrel для прослушивания всех сетевых интерфейсов
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ListenAnyIP(8080); // HTTP
+    serverOptions.ListenAnyIP(8081, listenOptions => // HTTPS
+    {
+        listenOptions.UseHttps();
+    });
+});
+
+// Настройка HTTPS будет осуществляться через переменные окружения ASPNETCORE_URLS и ASPNETCORE_Kestrel__Certificates__Default__Path
+
 // Настройка Serilog
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
@@ -24,6 +39,14 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+// Добавляем HTTP метрики Prometheus
+builder.Services.AddMetrics();
+
+// Определяем метрики
+var counter = Metrics.CreateCounter("binance_api_requests_total", "Total number of requests to Binance API");
+var requestDurationHistogram = Metrics.CreateHistogram("binance_api_request_duration_seconds", "Histogram of Binance API request durations");
+var lastPriceGauge = Metrics.CreateGauge("binance_last_price", "Last price from Binance API", new string[] { "symbol" });
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -83,9 +106,9 @@ builder.Services.AddScoped<IJsonDeserializerService, JsonDeserializerService>();
 
 var app = builder.Build();
 
-// Добавляем метрики Prometheus
-app.UseMetricServer();
-app.UseHttpMetrics();
+// Настраиваем сбор метрик Prometheus
+app.UseMetricServer();  // Добавляем эндпоинт для метрик
+app.UseHttpMetrics();   // Включаем сбор метрик HTTP запросов
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -99,12 +122,16 @@ app.UseGlobalExceptionHandler();
 // Enable CORS
 app.UseCors("AllowAll");
 
-app.UseHttpsRedirection();
+// Disabled HTTPS redirection as we're using HTTP only
+// app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
-app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+// Применяем миграции при запуске
+using (var scope = app.Services.CreateScope())
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    context.Database.Migrate();
 }
+
+app.Run();

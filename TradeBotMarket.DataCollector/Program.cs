@@ -9,6 +9,7 @@ using TradeBotMarket.DataAccess.Repositories;
 using TradeBotMarket.DataCollector.Jobs;
 using TradeBotMarket.Domain.Interfaces;
 using TradeBotMarket.Domain.Services;
+using Prometheus;
 
 // Получаем путь к исполняемому файлу
 string basePath = AppContext.BaseDirectory;
@@ -173,7 +174,12 @@ try
         }
     }
 
+    // Настраиваем веб-сервер для экспорта метрик Prometheus
+    var metricServer = new KestrelMetricServer(80);
+    metricServer.Start();
+    
     Log.Information("Starting DataCollector Service");
+    Log.Information("Prometheus metrics available at http://localhost:80/metrics");
     await host.RunAsync();
 }
 catch (Exception ex)

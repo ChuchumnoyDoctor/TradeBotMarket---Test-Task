@@ -1,27 +1,41 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:latest
     environment:
-      POSTGRES_DB: TradeBotMarket
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=TradeBotMarket
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    environment:
+      - DATA_SOURCE_NAME=postgresql://postgres:postgres@postgres:5432/TradeBotMarket?sslmode=disable
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
 
   api:
     build:
       context: .
       dockerfile: TradeBotMarket.ApiService/Dockerfile
     ports:
-      - "5000:80"
+      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - ./certs:/app/certs:ro
     depends_on:
       - postgres
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=TradeBotMarket;Username=postgres;Password=postgres
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:8081;http://+:8080
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/app/certs/localhost.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=your-password
 
   datacollector:
     build:
@@ -31,30 +45,37 @@ services:
       - postgres
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=TradeBotMarket;Username=postgres;Password=postgres
+      - ASPNETCORE_ENVIRONMENT=Development
 
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
 
   grafana:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/tradebot.json
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
 
 volumes:
   postgres_data:
   prometheus_data:
-  grafana_data: 
+  grafana_data:
